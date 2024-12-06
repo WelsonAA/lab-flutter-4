@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'camera_screen.dart'; // Import the CameraScreen
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import shared_preferences
 
 void main() {
   runApp(const MyApp());
@@ -35,51 +35,99 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String _address = 'Press button to get address';
+  TextEditingController _addressController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddress(); // Load the stored address when the app starts
+  }
+
+  // Function to load stored address from SharedPreferences
+  Future<void> _loadAddress() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedAddress = prefs.getString('address');
+    if (storedAddress != null) {
+      setState(() {
+        _address = storedAddress;
+      });
+    }
+  }
 
   // Function to check and request location permission
   Future<void> _checkLocationPermission() async {
-    PermissionStatus status = await Permission.location.status;
+    var status = await Permission.location.status;
 
     if (status.isGranted) {
-      // If permission is already granted, get the location
       _getLocation();
     } else if (status.isDenied) {
-      // If permission is denied, request permission
-      PermissionStatus newStatus = await Permission.location.request();
-      if (newStatus.isGranted) {
-        _getLocation(); // Fetch location after permission is granted
+      var result = await Permission.location.request();
+      if (result.isGranted) {
+        _getLocation();
+      } else if (result.isPermanentlyDenied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                "Location permission is permanently denied. Please enable it in settings."),
+          ),
+        );
+        openAppSettings();
       } else {
-        // Show message if permission is still denied
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Location permission is required.")),
         );
       }
     } else if (status.isPermanentlyDenied) {
-      // If the permission is permanently denied, open settings
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              "Location permission is permanently denied. Please enable it in settings."),
+        ),
+      );
       openAppSettings();
     }
   }
 
   // Function to get the location and reverse geocode it
   Future<void> _getLocation() async {
-    // Get the current position
     Position position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
 
-    // Use Geocoding to get the address from latitude and longitude
     List<Placemark> placemarks = await placemarkFromCoordinates(
       position.latitude,
       position.longitude,
     );
 
     setState(() {
-      // Set the first address from the placemarks list
       _address = '${placemarks.first.street}, '
           '${placemarks.first.locality}, '
           '${placemarks.first.administrativeArea}, '
           '${placemarks.first.country}';
     });
+
+    // Save the address in SharedPreferences
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setString('address', _address);
+  }
+
+  // Function to save a new address to SharedPreferences
+  Future<void> _saveNewAddress() async {
+    String newAddress = _addressController.text;
+    if (newAddress.isNotEmpty) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      prefs.setString('address', newAddress);
+      setState(() {
+        _address = newAddress;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Address saved successfully!")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid address.")),
+      );
+    }
   }
 
   @override
@@ -92,11 +140,8 @@ class _MyHomePageState extends State<MyHomePage> {
           children: <Widget>[
             ElevatedButton(
               onPressed: () {
-                // Navigate to the CameraScreen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CameraScreen()),
-                );
+                // You can navigate to the camera screen as before
+                // Navigator.push(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
               },
               child: const Text("Open Camera"),
             ),
@@ -107,8 +152,21 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             const SizedBox(height: 20),
             Text(
-              _address, // Display the address
+              _address, // Display the current address
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(
+                labelText: 'Enter New Address',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _saveNewAddress, // Save new address to SharedPreferences
+              child: const Text("Save New Address"),
             ),
           ],
         ),
