@@ -30,14 +30,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  sqflite: ^2.4.1
-  sqflite_common_ffi: ^2.0.0+4  # sqflite_common_ffi for desktop (Windows/macOS/Linux)
-  sqflite_common_ffi_web: ^0.4.5+4
   permission_handler: ^10.0.0
-  geolocator: ^13.0.2
-  geocoding: ^2.0.5
   camera: ^0.10.0+4  # Ensure this line is added
   shared_preferences: ^2.0.17
+  path_provider: ^2.0.11
 
 
 

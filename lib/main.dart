@@ -1,175 +1,126 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Import shared_preferences
+import 'package:shared_preferences/shared_preferences.dart';
+import 'camera_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      debugShowCheckedModeBanner: false,
+      home: ImageCaptureScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
+class ImageCaptureScreen extends StatefulWidget {
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  _ImageCaptureScreenState createState() => _ImageCaptureScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  String _address = 'Press button to get address';
-  TextEditingController _addressController = TextEditingController();
+class _ImageCaptureScreenState extends State<ImageCaptureScreen> {
+  File? _imageFile;
 
   @override
   void initState() {
     super.initState();
-    _loadAddress(); // Load the stored address when the app starts
+    _loadSavedImage();
   }
 
-  // Function to load stored address from SharedPreferences
-  Future<void> _loadAddress() async {
+  Future<void> _loadSavedImage() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? storedAddress = prefs.getString('address');
-    if (storedAddress != null) {
+    String? imagePath = prefs.getString('saved_image');
+    if (imagePath != null && File(imagePath).existsSync()) {
       setState(() {
-        _address = storedAddress;
+        _imageFile = File(imagePath);
       });
     }
   }
 
-  // Function to check and request location permission
-  Future<void> _checkLocationPermission() async {
-    var status = await Permission.location.status;
-
-    if (status.isGranted) {
-      _getLocation();
-    } else if (status.isDenied) {
-      var result = await Permission.location.request();
-      if (result.isGranted) {
-        _getLocation();
-      } else if (result.isPermanentlyDenied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                "Location permission is permanently denied. Please enable it in settings."),
-          ),
-        );
-        openAppSettings();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location permission is required.")),
-        );
-      }
-    } else if (status.isPermanentlyDenied) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              "Location permission is permanently denied. Please enable it in settings."),
-        ),
-      );
-      openAppSettings();
-    }
-  }
-
-  // Function to get the location and reverse geocode it
-  Future<void> _getLocation() async {
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    List<Placemark> placemarks = await placemarkFromCoordinates(
-      position.latitude,
-      position.longitude,
-    );
-
+  // Callback function to handle image captured from CameraScreen
+  void _handleImageCaptured(File image) async {
     setState(() {
-      _address = '${placemarks.first.street}, '
-          '${placemarks.first.locality}, '
-          '${placemarks.first.administrativeArea}, '
-          '${placemarks.first.country}';
+      _imageFile = image;
     });
-
-    // Save the address in SharedPreferences
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setString('address', _address);
-  }
-
-  // Function to save a new address to SharedPreferences
-  Future<void> _saveNewAddress() async {
-    String newAddress = _addressController.text;
-    if (newAddress.isNotEmpty) {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      prefs.setString('address', newAddress);
-      setState(() {
-        _address = newAddress;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Address saved successfully!")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid address.")),
-      );
-    }
+    prefs.setString('saved_image', image.path);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(
-              onPressed: () {
-                // You can navigate to the camera screen as before
-                // Navigator.push(context, MaterialPageRoute(builder: (context) => const CameraScreen()));
-              },
-              child: const Text("Open Camera"),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _checkLocationPermission, // Check location permission
-              child: const Text("Get Location"),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _address, // Display the current address
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(
-                labelText: 'Enter New Address',
-                border: OutlineInputBorder(),
+      appBar: AppBar(
+        title: const Text('Capturing Images'),
+        backgroundColor: Colors.purple,
+      ),
+      body: Column(
+        children: [SizedBox(width: 150,height: 150),
+          Center(
+            child: Container(
+              width: 380,
+              height: 500,
+              decoration: BoxDecoration(
+                color: Colors.white, // Set the background color to white
+                border: Border.all(
+                  color: Colors.black, // Black border color
+                  width: 2, // Border width
+                ),
+                borderRadius: BorderRadius.circular(15), // Rounded corners
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1), // Subtle shadow
+                    spreadRadius: 2, // Spread of the shadow
+                    blurRadius: 5, // Blur effect for the shadow
+                    offset: const Offset(0, 3), // Shadow position
+                  ),
+                ],
               ),
+              child: _imageFile != null
+                  ? ClipRRect(
+                borderRadius: BorderRadius.circular(15), // Match border radius for rounded corners
+                child: Image.file(
+                  _imageFile!,
+                  fit: BoxFit.cover,
+                ),
+              )
+                  : const Center(child: Text('Image should appear here')),
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _saveNewAddress, // Save new address to SharedPreferences
-              child: const Text("Save New Address"),
-            ),
-          ],
-        ),
+          ),
+
+
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CameraScreen(
+                        onImageCaptured: _handleImageCaptured, // Pass callback to CameraScreen
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Capture Image'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+
+                },
+                child: const Text('Select Image'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

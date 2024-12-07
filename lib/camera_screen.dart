@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
+import 'dart:io';
 
 class CameraScreen extends StatefulWidget {
-  const CameraScreen({super.key});
+  final Function(File) onImageCaptured; // Callback to return the image
+
+  const CameraScreen({super.key, required this.onImageCaptured});
 
   @override
   _CameraScreenState createState() => _CameraScreenState();
@@ -40,6 +43,14 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  Future<void> _captureImage() async {
+    if (_controller != null) {
+      final XFile file = await _controller!.takePicture();
+      widget.onImageCaptured(File(file.path)); // Return the captured image to the parent screen
+      Navigator.pop(context); // Return to the previous screen after capturing the image
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isCameraReady) {
@@ -58,9 +69,7 @@ class _CameraScreenState extends State<CameraScreen> {
             child: CameraPreview(_controller!),
           ),
           ElevatedButton(
-            onPressed: () {
-              // Handle taking a photo or other camera actions
-            },
+            onPressed: _captureImage,
             child: const Text("Capture"),
           ),
         ],
